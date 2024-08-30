@@ -4,6 +4,7 @@ import { MongoClient } from 'mongodb';
 import express from 'express';
 import { lastOfArray } from 'rxdb/plugins/core';
 import { Subject } from 'rxjs';
+import cors from 'cors';
 
 const mongoClient = new MongoClient(process.env.MONGOURI);
 const mongoConnection = await mongoClient.connect();
@@ -12,6 +13,8 @@ const mongoCollection = await mongoDatabase.collection('myDocs');
 
 const app = express();
 app.use(express.json());
+
+app.use(cors());
 
 app.get('/pull', async (req, res) => {
     const id = req.query.id;
@@ -45,7 +48,7 @@ app.get('/pull', async (req, res) => {
 let lastEventId = 0;
 const pullStream$ = new Subject();
 
-app.get('/push', async (req, res) => {
+app.post('/push', async (req, res) => {
     const changeRows = req.body;
     const conflicts = [];
     const event = {
