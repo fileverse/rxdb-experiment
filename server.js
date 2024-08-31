@@ -1,15 +1,12 @@
 import dotenv from 'dotenv';
 dotenv.config();
-import { MongoClient } from 'mongodb';
+
 import express from 'express';
 import { lastOfArray } from 'rxdb/plugins/core';
 import { Subject } from 'rxjs';
 import cors from 'cors';
-
-const mongoClient = new MongoClient(process.env.MONGOURI);
-const mongoConnection = await mongoClient.connect();
-const mongoDatabase = mongoConnection.db('rxdb');
-const mongoCollection = await mongoDatabase.collection('myDocs');
+import './database/index.js';
+import Models from './database/models/index.js';
 
 const app = express();
 app.use(express.json());
@@ -19,13 +16,8 @@ app.use(cors());
 app.get('/pull', async (req, res) => {
     const id = req.query.id;
     const updatedAt = parseFloat(req.query.updatedAt);
-    const documents = await mongoCollection.find({
+    const documents = await Models.DocumentUpdates.find({
         $or: [
-            /**
-             * Notice that we have to compare the updatedAt AND the id field
-             * because the updateAt field is not unique and when two documents have
-             * the same updateAt, we can still "sort" them by their id.
-             */
             {
                 updateAt: { $gt: updatedAt }
             },
@@ -57,7 +49,7 @@ app.post('/push', async (req, res) => {
         checkpoint: null
     };
     for (const changeRow of changeRows) {
-        const realMasterState = mongoCollection.findOne({id: changeRow.newDocumentState.id});
+        const realMasterState = await Models.DocumentUpdates.findOne({id: changeRow.newDocumentState.id});
         if(
             realMasterState && !changeRow.assumedMasterState ||
             (
@@ -73,7 +65,7 @@ app.post('/push', async (req, res) => {
             conflicts.push(realMasterState);
         } else {
             // no conflict -> write the document
-            mongoCollection.updateOne(
+            await Models.DocumentUpdates.updateOne(
                 {id: changeRow.newDocumentState.id},
                 changeRow.newDocumentState
             );
